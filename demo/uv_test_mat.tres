@@ -1,0 +1,6 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://dqlq3qsc6x78c"]
+
+[ext_resource type="Texture2D" uid="uid://thgbqthmlhj5" path="res://UV_checker_Map_byValle.jpg" id="1_o478v"]
+
+[resource]
+albedo_texture = ExtResource("1_o478v")
