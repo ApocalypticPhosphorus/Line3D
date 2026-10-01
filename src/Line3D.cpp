@@ -164,10 +164,10 @@ void Line3D::generate_mesh() {
             normals.push_back(radial.normalized());
 
             // Add UV coordinates
-            // U goes from 0 -> 1 around the circumference
+            // U goes from 0 -> 0.75 around the circumference
             // V goes from 0 -> 1 along the length of the line
             uvs.push_back(Vector2(
-                float(j) / float(resolution),
+                float(j) / float(resolution) * 0.75,
                 float(i) / float(segments)
             ));
         }

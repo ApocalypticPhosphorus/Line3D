@@ -17,7 +17,7 @@ env.Append(CPPPATH=["src/"])
 sources = Glob("src/*.cpp")
 
 library = env.SharedLibrary(
-    "bin/{}/{}{}".format(
+    "project/addons/line3d/bin/{}/{}{}".format(
         env["platform"],
         libname,
         env["SHLIBSUFFIX"]
@@ -25,9 +25,4 @@ library = env.SharedLibrary(
     source=sources,
 )
 
-copy = env.Install(
-    "{}/bin/{}/".format(projectdir, env["platform"]),
-    library
-)
-
-Default(copy)
+Default(library)

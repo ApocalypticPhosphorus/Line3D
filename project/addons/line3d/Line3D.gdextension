@@ -6,7 +6,7 @@ reloadable = true
 
 [libraries]
 
-windows.debug.x86_64 = "windows/Line3D.dll"
+windows.debug.x86_64 = "./bin/windows/Line3D.dll"
 
 [icons]
-Line3D = "res://icons/Line3D.svg"
+Line3D = "res://addons/line3d/icons/Line3D.svg"
