@@ -21,24 +21,41 @@ void Line3D::_bind_methods() {
     );
 
 
-    // Bind the set_radius and get_radius methods to the Godot scripting API
+    // Bind the set_width and get_width methods to the Godot scripting API
     ClassDB::bind_method(
-        D_METHOD("set_radius", "radius"),
-        &Line3D::set_radius
+        D_METHOD("set_width", "width"),
+        &Line3D::set_width
     );
 
     ClassDB::bind_method(
-        D_METHOD("get_radius"),
-        &Line3D::get_radius
+        D_METHOD("get_width"),
+        &Line3D::get_width
     );
 
     ADD_PROPERTY(
         PropertyInfo(Variant::FLOAT, 
-        "radius",
+        "width",
         PROPERTY_HINT_RANGE,
         "0.0,100.0,0.01"),
-        "set_radius",
-        "get_radius"
+        "set_width",
+        "get_width"
+    );
+
+    // Bind the set_width_curve and get_width_curve methods to the Godot scripting API
+    ClassDB::bind_method(
+        D_METHOD("set_width_curve", "width_curve"),
+        &Line3D::set_width_curve
+    );
+
+    ClassDB::bind_method(
+        D_METHOD("get_width_curve"),
+        &Line3D::get_width_curve
+    );
+
+    ADD_PROPERTY(
+        PropertyInfo(Variant::OBJECT, "width_curve", PROPERTY_HINT_RESOURCE_TYPE, "Curve"),
+        "set_width_curve",
+        "get_width_curve"
     );
 
     // Bind the set_capped and is_capped methods to the Godot scripting API
@@ -108,7 +125,7 @@ Line3D::~Line3D() {
 //Generate the mesh based on the curve, radius, and capped properties
 void Line3D::generate_mesh() {
 
-    if (!curve.is_valid() || segments < 1 || resolution < 3 || radius <= 0.0f) {
+    if (!curve.is_valid() || segments < 1 || resolution < 3 || width <= 0.0f) {
         return;
     }
 
@@ -131,6 +148,7 @@ void Line3D::generate_mesh() {
     float total_length = curve->get_baked_length();
     float segment_length = total_length / float(segments);
 
+    // Generate segments
     for (int i = 0; i <= segments; i++) {
 
         // 1. Get transform at this distance
@@ -145,6 +163,12 @@ void Line3D::generate_mesh() {
         Vector3 circle_axis_1 = ring_transform.basis.get_column(0).normalized();
         Vector3 circle_axis_2 = ring_transform.basis.get_column(1).normalized();
 
+        // Get width from width_curve if it exists, from 0 at the start to 1 at the end of the curve. If width_curve is not valid, use the default width.
+        float segment_width = 1.0f; // Default width
+        if (width_curve.is_valid()) {
+            segment_width = width_curve->sample(float(i) / float(segments));
+        }
+
         // 4. Generate resolution + 1 vertices
         //    The final vertex duplicates the first vertex so the UV can reach 1.0
         for (int j = 0; j <= resolution; j++) {
@@ -158,7 +182,7 @@ void Line3D::generate_mesh() {
                 circle_axis_2 * Math::sin(angle);
 
             // Add vertex
-            vertices.push_back(center + radial * radius);
+            vertices.push_back(center + radial * width / 2.0f * segment_width);
 
             // Add corresponding normal
             normals.push_back(radial.normalized());
@@ -223,17 +247,23 @@ void Line3D::generate_mesh() {
         Vector3 start_circle_axis_1 = curve->sample_baked_with_rotation(0).basis.get_column(0).normalized();
         Vector3 start_circle_axis_2 = curve->sample_baked_with_rotation(0).basis.get_column(1).normalized();
 
+        //Get segment width at start, if the width curve is valid, otherwise use the default width.
+        float start_segment_width = 1.0f; // Default width
+        if (width_curve.is_valid()) {
+            start_segment_width = width_curve->sample(0.0f);
+        }
+
         for (int vertex = 0; vertex <= resolution; vertex++) {
             float angle = (float(vertex) / float(resolution)) * Math::TAU;
             Vector3 radial = start_circle_axis_1 * Math::cos(angle) + start_circle_axis_2 * Math::sin(angle);
-            vertices.push_back(start_transform_origin + radial * radius);
+            vertices.push_back(start_transform_origin + radial * width / 2.0f * start_segment_width);
             normals.push_back(start_normal);
             //why doesnt this work correctly? The radial vector is in world space, but the UVs are in local space. We need to transform the radial vector into local space before calculating the UVs.
             // Transform the radial vector into local space
             radial = curve->sample_baked_with_rotation(0).basis.xform(radial);
             uvs.push_back(Vector2(
-                0.875 + radial.x * 0.125,
-                0.125 + radial.y * 0.125
+                0.875 - radial.x * 0.125,
+                0.125 - radial.y * 0.125
             ));
         }
 
@@ -265,16 +295,21 @@ void Line3D::generate_mesh() {
         Vector3 end_circle_axis_1 = curve->sample_baked_with_rotation(total_length).basis.get_column(0).normalized();
         Vector3 end_circle_axis_2 = curve->sample_baked_with_rotation(total_length).basis.get_column(1).normalized();
 
+        float end_segment_width = 1.0f; // Default width
+        if (width_curve.is_valid()) {
+            end_segment_width = width_curve->sample(1.0f); // Sample at the end of the curve
+        }
+
         for (int vertex = 0; vertex <= resolution; vertex++) {
             float angle = (float(vertex) / float(resolution)) * Math::TAU;
             Vector3 radial = end_circle_axis_1 * Math::cos(angle) + end_circle_axis_2 * Math::sin(angle);
-            vertices.push_back(end_transform_origin + radial * radius);
+            vertices.push_back(end_transform_origin + radial * width / 2.0f * end_segment_width);
             normals.push_back(end_normal);
             // Transform the radial vector into local space
             radial = curve->sample_baked_with_rotation(total_length).basis.xform(radial);
             uvs.push_back(Vector2(
                 0.875 + radial.x * 0.125,
-                0.375 + radial.y * 0.125
+                0.375 - radial.y * 0.125
             ));
         }
 
@@ -327,13 +362,40 @@ Ref<Curve3D> Line3D::get_curve() const {
     return curve;
 }
 
-void Line3D::set_radius(float p_radius) {
-    radius = p_radius;
+void Line3D::set_width(float p_width) {
+    width = p_width;
     generate_mesh();
 }
 
-float Line3D::get_radius() const {
-    return radius;
+float Line3D::get_width() const {
+    return width;
+}
+
+void Line3D::set_width_curve(const Ref<Curve> &p_width_curve) {
+    // Disconnect from the old width curve
+    if (width_curve.is_valid()) {
+        Callable callable = Callable(this, "generate_mesh");
+
+        if (width_curve->is_connected("changed", callable)) {
+            width_curve->disconnect("changed", callable);
+        }
+    }
+
+    // Store the new width curve
+    width_curve = p_width_curve;
+
+    // Connect to the new width curve
+    if (width_curve.is_valid()) {
+        Callable callable = Callable(this, "generate_mesh");
+        width_curve->connect("changed", callable);
+    }
+    
+    // Rebuild the mesh
+    generate_mesh();
+}
+
+Ref<Curve> Line3D::get_width_curve() const {
+    return width_curve;
 }
 
 void Line3D::set_capped(bool p_capped) {
