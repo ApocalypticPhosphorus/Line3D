@@ -178,8 +178,7 @@ void Line3D::generate_mesh() {
         for (int vertex = 0; vertex < resolution; vertex++) {
 
             // Current vertex on the current ring
-            int current_ring_vertex =
-                ring * (resolution + 1) + vertex;
+            int current_ring_vertex = ring * (resolution + 1) + vertex;
 
             // Same vertex position on the next ring
             int next_ring_vertex =
@@ -208,23 +207,40 @@ void Line3D::generate_mesh() {
     // 6. If capped, generate the end caps
     if (capped) {
         // Generate the start cap
-        Vector3 start_transform_origin =
-            curve->sample_baked_with_rotation(0).origin;
-        Vector3 start_normal =
-            -curve->sample_baked_with_rotation(0).basis.get_column(2).normalized();
+
+        //Re-generate the entire start cap to ensure normals and uvs are correct for the cap.
+        //The circle uvs should be a circle of diameter 0.25 with a center at (0.875, 0.125) in uv space. The normals should be the negative of the tangent at the start of the curve.
+        Vector3 start_transform_origin = curve->sample_baked_with_rotation(0).origin;
+        Vector3 start_normal = -curve->sample_baked_with_rotation(0).basis.get_column(2).normalized();
 
         int start_center_index = vertices.size();
 
         vertices.push_back(start_transform_origin);
         normals.push_back(start_normal);
-        uvs.push_back(Vector2(0.5, 0.5));
+        uvs.push_back(Vector2(0.875, 0.125));
 
-        // The first ring contains resolution + 1 vertices.
-        // The final vertex is a duplicate of vertex 0 for the UV seam,
-        // so only use vertices 0 through resolution - 1 for the cap.
+        //Generate first ring of vertices for the start cap. The first ring contains resolution + 1 vertices, with the final vertex being a duplicate of vertex 0 for the UV seam.
+        Vector3 start_circle_axis_1 = curve->sample_baked_with_rotation(0).basis.get_column(0).normalized();
+        Vector3 start_circle_axis_2 = curve->sample_baked_with_rotation(0).basis.get_column(1).normalized();
+
+        for (int vertex = 0; vertex <= resolution; vertex++) {
+            float angle = (float(vertex) / float(resolution)) * Math::TAU;
+            Vector3 radial = start_circle_axis_1 * Math::cos(angle) + start_circle_axis_2 * Math::sin(angle);
+            vertices.push_back(start_transform_origin + radial * radius);
+            normals.push_back(start_normal);
+            //why doesnt this work correctly? The radial vector is in world space, but the UVs are in local space. We need to transform the radial vector into local space before calculating the UVs.
+            // Transform the radial vector into local space
+            radial = curve->sample_baked_with_rotation(0).basis.xform(radial);
+            uvs.push_back(Vector2(
+                0.875 + radial.x * 0.125,
+                0.125 + radial.y * 0.125
+            ));
+        }
+
+        //Generate the triangles for the start cap. Each triangle connects the center vertex to two adjacent vertices on the new first ring.
         for (int vertex = 0; vertex < resolution; vertex++) {
-            int current_ring_vertex = vertex;
-            int next_ring_vertex = vertex + 1;
+            int current_ring_vertex = start_center_index + 1 + vertex;
+            int next_ring_vertex = start_center_index + 1 + vertex + 1;
 
             indices.push_back(start_center_index);
             indices.push_back(next_ring_vertex);
@@ -242,15 +258,30 @@ void Line3D::generate_mesh() {
 
         vertices.push_back(end_transform_origin);
         normals.push_back(end_normal);
-        uvs.push_back(Vector2(0.5, 0.5));
+        //End cap UVs should be a circle of diameter 0.25 with a center at (0.875, 0.375) in uv space.
+        uvs.push_back(Vector2(0.875, 0.375));
 
-        // Find the first vertex of the final ring.
-        // Each ring now contains resolution + 1 vertices.
-        int end_ring_start = segments * (resolution + 1);
+        //Generate first ring of vertices for the end cap. The first ring contains resolution + 1 vertices, with the final vertex being a duplicate of vertex 0 for the UV seam.
+        Vector3 end_circle_axis_1 = curve->sample_baked_with_rotation(total_length).basis.get_column(0).normalized();
+        Vector3 end_circle_axis_2 = curve->sample_baked_with_rotation(total_length).basis.get_column(1).normalized();
 
+        for (int vertex = 0; vertex <= resolution; vertex++) {
+            float angle = (float(vertex) / float(resolution)) * Math::TAU;
+            Vector3 radial = end_circle_axis_1 * Math::cos(angle) + end_circle_axis_2 * Math::sin(angle);
+            vertices.push_back(end_transform_origin + radial * radius);
+            normals.push_back(end_normal);
+            // Transform the radial vector into local space
+            radial = curve->sample_baked_with_rotation(total_length).basis.xform(radial);
+            uvs.push_back(Vector2(
+                0.875 + radial.x * 0.125,
+                0.375 + radial.y * 0.125
+            ));
+        }
+
+        //Generate the triangles for the end cap. Each triangle connects the center vertex to two adjacent vertices on the new first ring.
         for (int vertex = 0; vertex < resolution; vertex++) {
-            int current_ring_vertex = end_ring_start + vertex;
-            int next_ring_vertex = end_ring_start + vertex + 1;
+            int current_ring_vertex = end_center_index + 1 + vertex;
+            int next_ring_vertex = end_center_index + 1 + vertex + 1;
 
             indices.push_back(end_center_index);
             indices.push_back(current_ring_vertex);

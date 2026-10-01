@@ -5,7 +5,7 @@ void vertex() {
 }
 
 void fragment() {// Map UV coordinates to the Albedo color output
-	ALBEDO = vec3(UV.x, UV.x, UV.x);
+	ALBEDO = vec3(UV.x, UV.y, 0);
 }
 
 //void light() {
