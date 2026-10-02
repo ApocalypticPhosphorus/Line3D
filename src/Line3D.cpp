@@ -60,19 +60,24 @@ void Line3D::_bind_methods() {
 
     // Bind the set_capped and is_capped methods to the Godot scripting API
     ClassDB::bind_method(
-        D_METHOD("set_capped", "capped"),
-        &Line3D::set_capped
+        D_METHOD("set_cap_mode", "cap_mode"),
+        &Line3D::set_cap_mode
     );
 
     ClassDB::bind_method(
-        D_METHOD("is_capped"),
-        &Line3D::is_capped
+        D_METHOD("get_cap_mode"),
+        &Line3D::get_cap_mode
     );
 
+    BIND_ENUM_CONSTANT(CAP_NONE);
+    BIND_ENUM_CONSTANT(CAP_FLAT);
+    BIND_ENUM_CONSTANT(CAP_CONE);
+    BIND_ENUM_CONSTANT(CAP_ROUND);
+
     ADD_PROPERTY(
-        PropertyInfo(Variant::BOOL, "capped"),
-        "set_capped",
-        "is_capped"
+        PropertyInfo(Variant::INT, "cap_mode", PROPERTY_HINT_ENUM, "None,Flat,Cone,Round"),
+        "set_cap_mode",
+        "get_cap_mode"
     );
 
     // Bind the set_segments and get_segments methods to the Godot scripting API
@@ -229,7 +234,7 @@ void Line3D::generate_mesh() {
     }
 
     // 6. If capped, generate the end caps
-    if (capped) {
+    if (cap_mode == CAP_FLAT || cap_mode == CAP_CONE) {
         // Generate the start cap
 
         //Re-generate the entire start cap to ensure normals and uvs are correct for the cap.
@@ -239,7 +244,13 @@ void Line3D::generate_mesh() {
 
         int start_center_index = vertices.size();
 
-        vertices.push_back(start_transform_origin);
+        //if the cap mode is cone, we need to add a vertex at the center of the start cap that is offset along the normal by the width of the line by half of the width. This will create a cone shape for the start cap.
+        if (cap_mode == CAP_CONE) {
+            vertices.push_back(start_transform_origin - start_normal * width / 2.0f);
+        } else {
+            vertices.push_back(start_transform_origin);
+        }
+
         normals.push_back(start_normal);
         uvs.push_back(Vector2(0.875, 0.125));
 
@@ -286,9 +297,13 @@ void Line3D::generate_mesh() {
 
         int end_center_index = vertices.size();
 
-        vertices.push_back(end_transform_origin);
+        if(cap_mode == CAP_CONE) {
+            vertices.push_back(end_transform_origin - end_normal * width / 2.0f);
+        } else {
+            vertices.push_back(end_transform_origin);
+        }
+
         normals.push_back(end_normal);
-        //End cap UVs should be a circle of diameter 0.25 with a center at (0.875, 0.375) in uv space.
         uvs.push_back(Vector2(0.875, 0.375));
 
         //Generate first ring of vertices for the end cap. The first ring contains resolution + 1 vertices, with the final vertex being a duplicate of vertex 0 for the UV seam.
@@ -309,7 +324,7 @@ void Line3D::generate_mesh() {
             radial = curve->sample_baked_with_rotation(total_length).basis.xform(radial);
             uvs.push_back(Vector2(
                 0.875 + radial.x * 0.125,
-                0.375 - radial.y * 0.125
+                0.375 + radial.y * 0.125
             ));
         }
 
@@ -398,13 +413,13 @@ Ref<Curve> Line3D::get_width_curve() const {
     return width_curve;
 }
 
-void Line3D::set_capped(bool p_capped) {
-    capped = p_capped;
+void Line3D::set_cap_mode(CapMode p_cap_mode) {
+    cap_mode = p_cap_mode;
     generate_mesh();
 }
 
-bool Line3D::is_capped() const {
-    return capped;
+Line3D::CapMode Line3D::get_cap_mode() const {
+    return cap_mode;
 }
 
 void Line3D::set_segments(int p_segments) {
