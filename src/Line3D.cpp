@@ -3,7 +3,7 @@
 using namespace godot;
 
 void Line3D::_bind_methods() {
-    // Bind the set_curve and get_curve methods to the Godot scripting API
+
     ClassDB::bind_method(
         D_METHOD("set_curve", "curve"),
         &Line3D::set_curve
@@ -21,7 +21,6 @@ void Line3D::_bind_methods() {
     );
 
 
-    // Bind the set_width and get_width methods to the Godot scripting API
     ClassDB::bind_method(
         D_METHOD("set_width", "width"),
         &Line3D::set_width
@@ -41,7 +40,6 @@ void Line3D::_bind_methods() {
         "get_width"
     );
 
-    // Bind the set_width_curve and get_width_curve methods to the Godot scripting API
     ClassDB::bind_method(
         D_METHOD("set_width_curve", "width_curve"),
         &Line3D::set_width_curve
@@ -58,7 +56,6 @@ void Line3D::_bind_methods() {
         "get_width_curve"
     );
 
-    // Bind the set_capped and is_capped methods to the Godot scripting API
     ClassDB::bind_method(
         D_METHOD("set_cap_mode", "cap_mode"),
         &Line3D::set_cap_mode
@@ -80,7 +77,6 @@ void Line3D::_bind_methods() {
         "get_cap_mode"
     );
 
-    // Bind the set_segments and get_segments methods to the Godot scripting API
     ClassDB::bind_method(
         D_METHOD("set_segments", "segments"),
         &Line3D::set_segments
@@ -97,7 +93,6 @@ void Line3D::_bind_methods() {
         "get_segments"
     );
 
-    // Bind the set_resolution and get_resolution methods to the Godot scripting API
     ClassDB::bind_method(
         D_METHOD("set_resolution", "resolution"),
         &Line3D::set_resolution
@@ -127,7 +122,6 @@ Line3D::Line3D() {
 Line3D::~Line3D() {
 }
 
-//Generate the mesh based on the curve, radius, and capped properties
 void Line3D::generate_mesh() {
 
     if (!curve.is_valid() || segments < 1 || resolution < 3 || width <= 0.0f) {
@@ -163,8 +157,7 @@ void Line3D::generate_mesh() {
         // 2. Get center from transform
         Vector3 center = ring_transform.origin;
 
-        // 3. Get two perpendicular directions
-        //    from ring_transform.basis
+        // 3. Get two perpendicular directions from ring_transform.basis
         Vector3 circle_axis_1 = ring_transform.basis.get_column(0).normalized();
         Vector3 circle_axis_2 = ring_transform.basis.get_column(1).normalized();
 
@@ -174,8 +167,7 @@ void Line3D::generate_mesh() {
             segment_width = width_curve->sample(float(i) / float(segments));
         }
 
-        // 4. Generate resolution + 1 vertices
-        //    The final vertex duplicates the first vertex so the UV can reach 1.0
+        // 4. Generate resolution + 1 vertices. The final vertex duplicates the first vertex so the UV can reach 1.0
         for (int j = 0; j <= resolution; j++) {
 
             // Calculate angle
@@ -193,8 +185,8 @@ void Line3D::generate_mesh() {
             normals.push_back(radial.normalized());
 
             // Add UV coordinates
-            // U goes from 0 -> 0.75 around the circumference
-            // V goes from 0 -> 1 along the length of the line
+            // U goes from 0 to 0.75 around the circumference
+            // V goes from 0 to 1 along the length of the line
             uvs.push_back(Vector2(
                 float(j) / float(resolution) * 0.75,
                 float(i) / float(segments)
@@ -237,14 +229,15 @@ void Line3D::generate_mesh() {
     if (cap_mode == CAP_FLAT || cap_mode == CAP_CONE) {
         // Generate the start cap
 
-        //Re-generate the entire start cap to ensure normals and uvs are correct for the cap.
-        //The circle uvs should be a circle of diameter 0.25 with a center at (0.875, 0.125) in uv space. The normals should be the negative of the tangent at the start of the curve.
-        Vector3 start_transform_origin = curve->sample_baked_with_rotation(0).origin;
-        Vector3 start_normal = -curve->sample_baked_with_rotation(0).basis.get_column(2).normalized();
+        // Re-generate the entire start cap to ensure normals and uvs are correct for the cap.
+        // The circle uvs should be a circle of diameter 0.25 with a center at (0.875, 0.125) in uv space. The normals should be the negative of the tangent at the start of the curve.
+        Transform3D start_transform = curve->sample_baked_with_rotation(0);
+        Vector3 start_transform_origin = start_transform.origin;
+        Vector3 start_normal = -start_transform.basis.get_column(2).normalized();
 
         int start_center_index = vertices.size();
 
-        //if the cap mode is cone, we need to add a vertex at the center of the start cap that is offset along the normal by the width of the line by half of the width. This will create a cone shape for the start cap.
+        // If the cap mode is cone, we need to add a vertex at the center of the start cap that is offset along the normal by the width of the line by half of the width. This will create a cone shape for the start cap.
         if (cap_mode == CAP_CONE) {
             vertices.push_back(start_transform_origin - start_normal * width / 2.0f);
         } else {
@@ -254,11 +247,11 @@ void Line3D::generate_mesh() {
         normals.push_back(start_normal);
         uvs.push_back(Vector2(0.875, 0.125));
 
-        //Generate first ring of vertices for the start cap. The first ring contains resolution + 1 vertices, with the final vertex being a duplicate of vertex 0 for the UV seam.
-        Vector3 start_circle_axis_1 = curve->sample_baked_with_rotation(0).basis.get_column(0).normalized();
-        Vector3 start_circle_axis_2 = curve->sample_baked_with_rotation(0).basis.get_column(1).normalized();
+        // Generate first ring of vertices for the start cap. The first ring contains resolution + 1 vertices, with the final vertex being a duplicate of vertex 0 for the UV seam.
+        Vector3 start_circle_axis_1 = start_transform.basis.get_column(0).normalized();
+        Vector3 start_circle_axis_2 = start_transform.basis.get_column(1).normalized();
 
-        //Get segment width at start, if the width curve is valid, otherwise use the default width.
+        // Get segment width at start, if the width curve is valid, otherwise use the default width.
         float start_segment_width = 1.0f; // Default width
         if (width_curve.is_valid()) {
             start_segment_width = width_curve->sample(0.0f);
@@ -268,17 +261,19 @@ void Line3D::generate_mesh() {
             float angle = (float(vertex) / float(resolution)) * Math::TAU;
             Vector3 radial = start_circle_axis_1 * Math::cos(angle) + start_circle_axis_2 * Math::sin(angle);
             vertices.push_back(start_transform_origin + radial * width / 2.0f * start_segment_width);
-            normals.push_back(start_normal);
-            //why doesnt this work correctly? The radial vector is in world space, but the UVs are in local space. We need to transform the radial vector into local space before calculating the UVs.
+            if (cap_mode == CAP_CONE) {
+                normals.push_back(-radial.normalized());
+            } else {
+                normals.push_back(start_normal);
+            }
             // Transform the radial vector into local space
-            radial = curve->sample_baked_with_rotation(0).basis.xform(radial);
             uvs.push_back(Vector2(
-                0.875 - radial.x * 0.125,
-                0.125 - radial.y * 0.125
+                0.875 + Math::cos(angle) * 0.125,
+                0.125 - Math::sin(angle) * 0.125
             ));
         }
 
-        //Generate the triangles for the start cap. Each triangle connects the center vertex to two adjacent vertices on the new first ring.
+        // Generate the triangles for the start cap. Each triangle connects the center vertex to two adjacent vertices on the new first ring.
         for (int vertex = 0; vertex < resolution; vertex++) {
             int current_ring_vertex = start_center_index + 1 + vertex;
             int next_ring_vertex = start_center_index + 1 + vertex + 1;
@@ -290,10 +285,9 @@ void Line3D::generate_mesh() {
 
 
         // Generate the end cap
-        Vector3 end_transform_origin =
-            curve->sample_baked_with_rotation(total_length).origin;
-        Vector3 end_normal =
-            curve->sample_baked_with_rotation(total_length).basis.get_column(2).normalized();
+        Transform3D end_transform = curve->sample_baked_with_rotation(total_length);
+        Vector3 end_transform_origin = end_transform.origin;
+        Vector3 end_normal = -end_transform.basis.get_column(2).normalized();
 
         int end_center_index = vertices.size();
 
@@ -306,9 +300,9 @@ void Line3D::generate_mesh() {
         normals.push_back(end_normal);
         uvs.push_back(Vector2(0.875, 0.375));
 
-        //Generate first ring of vertices for the end cap. The first ring contains resolution + 1 vertices, with the final vertex being a duplicate of vertex 0 for the UV seam.
-        Vector3 end_circle_axis_1 = curve->sample_baked_with_rotation(total_length).basis.get_column(0).normalized();
-        Vector3 end_circle_axis_2 = curve->sample_baked_with_rotation(total_length).basis.get_column(1).normalized();
+        // Generate first ring of vertices for the end cap. The first ring contains resolution + 1 vertices, with the final vertex being a duplicate of vertex 0 for the UV seam.
+        Vector3 end_circle_axis_1 = end_transform.basis.get_column(0).normalized();
+        Vector3 end_circle_axis_2 = end_transform.basis.get_column(1).normalized();
 
         float end_segment_width = 1.0f; // Default width
         if (width_curve.is_valid()) {
@@ -319,16 +313,18 @@ void Line3D::generate_mesh() {
             float angle = (float(vertex) / float(resolution)) * Math::TAU;
             Vector3 radial = end_circle_axis_1 * Math::cos(angle) + end_circle_axis_2 * Math::sin(angle);
             vertices.push_back(end_transform_origin + radial * width / 2.0f * end_segment_width);
-            normals.push_back(end_normal);
-            // Transform the radial vector into local space
-            radial = curve->sample_baked_with_rotation(total_length).basis.xform(radial);
+            if(cap_mode == CAP_CONE) {
+                normals.push_back(-radial.normalized());
+            } else {
+                normals.push_back(end_normal);
+            }
             uvs.push_back(Vector2(
-                0.875 + radial.x * 0.125,
-                0.375 + radial.y * 0.125
+                0.875 - Math::cos(angle) * 0.125,
+                0.375 - Math::sin(angle) * 0.125
             ));
         }
 
-        //Generate the triangles for the end cap. Each triangle connects the center vertex to two adjacent vertices on the new first ring.
+        // Generate the triangles for the end cap. Each triangle connects the center vertex to two adjacent vertices on the new first ring.
         for (int vertex = 0; vertex < resolution; vertex++) {
             int current_ring_vertex = end_center_index + 1 + vertex;
             int next_ring_vertex = end_center_index + 1 + vertex + 1;
