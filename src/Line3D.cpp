@@ -144,6 +144,8 @@ void Line3D::generate_mesh() {
     PackedVector3Array normals;
     PackedVector2Array uvs;
 
+    float radius = width / 2.0f;
+
     float total_length = curve->get_baked_length();
     float segment_length = total_length / float(segments);
 
@@ -151,8 +153,7 @@ void Line3D::generate_mesh() {
     for (int i = 0; i <= segments; i++) {
 
         // 1. Get transform at this distance
-        Transform3D ring_transform =
-            curve->sample_baked_with_rotation(segment_length * float(i));
+        Transform3D ring_transform = curve->sample_baked_with_rotation(segment_length * float(i));
 
         // 2. Get center from transform
         Vector3 center = ring_transform.origin;
@@ -229,7 +230,6 @@ void Line3D::generate_mesh() {
     if (cap_mode == CAP_FLAT || cap_mode == CAP_CONE) {
         // Generate the start cap
 
-        // Re-generate the entire start cap to ensure normals and uvs are correct for the cap.
         // The circle uvs should be a circle of diameter 0.25 with a center at (0.875, 0.125) in uv space. The normals should be the negative of the tangent at the start of the curve.
         Transform3D start_transform = curve->sample_baked_with_rotation(0);
         Vector3 start_transform_origin = start_transform.origin;
@@ -237,9 +237,14 @@ void Line3D::generate_mesh() {
 
         int start_center_index = vertices.size();
 
+        float start_segment_width = 1.0f;
+        if (width_curve.is_valid()) {
+            start_segment_width = width_curve->sample(0.0f);
+        }
+
         // If the cap mode is cone, we need to add a vertex at the center of the start cap that is offset along the normal by the width of the line by half of the width. This will create a cone shape for the start cap.
         if (cap_mode == CAP_CONE) {
-            vertices.push_back(start_transform_origin - start_normal * width / 2.0f);
+            vertices.push_back(start_transform_origin - start_normal * radius * start_segment_width);
         } else {
             vertices.push_back(start_transform_origin);
         }
@@ -251,18 +256,12 @@ void Line3D::generate_mesh() {
         Vector3 start_circle_axis_1 = start_transform.basis.get_column(0).normalized();
         Vector3 start_circle_axis_2 = start_transform.basis.get_column(1).normalized();
 
-        // Get segment width at start, if the width curve is valid, otherwise use the default width.
-        float start_segment_width = 1.0f; // Default width
-        if (width_curve.is_valid()) {
-            start_segment_width = width_curve->sample(0.0f);
-        }
-
         for (int vertex = 0; vertex <= resolution; vertex++) {
             float angle = (float(vertex) / float(resolution)) * Math::TAU;
             Vector3 radial = start_circle_axis_1 * Math::cos(angle) + start_circle_axis_2 * Math::sin(angle);
-            vertices.push_back(start_transform_origin + radial * width / 2.0f * start_segment_width);
+            vertices.push_back(start_transform_origin + radial * radius * start_segment_width);
             if (cap_mode == CAP_CONE) {
-                normals.push_back(-radial.normalized());
+                normals.push_back((radial - start_normal).normalized());
             } else {
                 normals.push_back(start_normal);
             }
@@ -287,12 +286,17 @@ void Line3D::generate_mesh() {
         // Generate the end cap
         Transform3D end_transform = curve->sample_baked_with_rotation(total_length);
         Vector3 end_transform_origin = end_transform.origin;
-        Vector3 end_normal = -end_transform.basis.get_column(2).normalized();
+        Vector3 end_normal = end_transform.basis.get_column(2).normalized();
 
         int end_center_index = vertices.size();
 
+        float end_segment_width = 1.0f;
+        if (width_curve.is_valid()) {
+            end_segment_width = width_curve->sample(1.0f);
+        }
+
         if(cap_mode == CAP_CONE) {
-            vertices.push_back(end_transform_origin - end_normal * width / 2.0f);
+            vertices.push_back(end_transform_origin - end_normal * radius * end_segment_width);
         } else {
             vertices.push_back(end_transform_origin);
         }
@@ -304,17 +308,12 @@ void Line3D::generate_mesh() {
         Vector3 end_circle_axis_1 = end_transform.basis.get_column(0).normalized();
         Vector3 end_circle_axis_2 = end_transform.basis.get_column(1).normalized();
 
-        float end_segment_width = 1.0f; // Default width
-        if (width_curve.is_valid()) {
-            end_segment_width = width_curve->sample(1.0f); // Sample at the end of the curve
-        }
-
         for (int vertex = 0; vertex <= resolution; vertex++) {
             float angle = (float(vertex) / float(resolution)) * Math::TAU;
             Vector3 radial = end_circle_axis_1 * Math::cos(angle) + end_circle_axis_2 * Math::sin(angle);
-            vertices.push_back(end_transform_origin + radial * width / 2.0f * end_segment_width);
+            vertices.push_back(end_transform_origin + radial * radius * end_segment_width);
             if(cap_mode == CAP_CONE) {
-                normals.push_back(-radial.normalized());
+                normals.push_back((radial - end_normal).normalized() );
             } else {
                 normals.push_back(end_normal);
             }
