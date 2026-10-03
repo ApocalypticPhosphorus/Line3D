@@ -5,6 +5,7 @@
 #include <godot_cpp/classes/curve3d.hpp>
 #include <godot_cpp/classes/curve.hpp>
 #include <godot_cpp/core/binder_common.hpp>
+#include <godot_cpp/classes/path3d.hpp>
 
 using namespace godot;
 
@@ -37,6 +38,10 @@ private:
     void generate_mesh();
 
     Ref<ArrayMesh> array_mesh;
+
+    void try_assign_parent_curve();
+
+    void _notification(int p_what);
 
 protected:
     static void _bind_methods();

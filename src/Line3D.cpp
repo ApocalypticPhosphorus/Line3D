@@ -434,3 +434,32 @@ void Line3D::set_resolution(int p_resolution) {
 int Line3D::get_resolution() const {
     return resolution;
 }
+
+void Line3D::try_assign_parent_curve() {
+    Node *parent_node = get_parent();
+
+    if (!parent_node) {
+        return;
+    }
+
+    Path3D *path_node = Object::cast_to<Path3D>(parent_node);
+
+    if (!path_node) {
+        return;
+    }
+
+    Ref<Curve3D> parent_curve = path_node->get_curve();
+
+    if (parent_curve.is_valid()) {
+        curve = parent_curve;
+        generate_mesh();
+    }
+}
+
+void Line3D::_notification(int p_what) {
+    switch (p_what) {
+        case NOTIFICATION_PARENTED:
+            try_assign_parent_curve();
+            break;
+    }
+}
