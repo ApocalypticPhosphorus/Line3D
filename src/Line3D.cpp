@@ -227,24 +227,42 @@ void Line3D::generate_mesh() {
     }
 
     // 6. If capped, generate the end caps
+
+    // Start cap data
+    Transform3D start_transform = curve->sample_baked_with_rotation(0);
+    Vector3 start_transform_origin = start_transform.origin;
+    Vector3 start_tangent = start_transform.basis.get_column(2).normalized();
+    Vector3 start_normal = -start_tangent;
+
+    float start_segment_width = 1.0f;
+    if (width_curve.is_valid()) {
+        start_segment_width = width_curve->sample(0.0f);
+    }
+
+    Vector3 start_circle_axis_1 = start_transform.basis.get_column(0).normalized();
+    Vector3 start_circle_axis_2 = start_transform.basis.get_column(1).normalized();
+
+    // End cap data
+    Transform3D end_transform = curve->sample_baked_with_rotation(total_length);
+    Vector3 end_transform_origin = end_transform.origin;
+    Vector3 end_tangent = end_transform.basis.get_column(2).normalized();
+    Vector3 end_normal = end_tangent;
+
+    float end_segment_width = 1.0f;
+    if (width_curve.is_valid()) {
+        end_segment_width = width_curve->sample(1.0f);
+    }
+
+    Vector3 end_circle_axis_1 = end_transform.basis.get_column(0).normalized();
+    Vector3 end_circle_axis_2 = end_transform.basis.get_column(1).normalized();
+
     if (cap_mode == CAP_FLAT || cap_mode == CAP_CONE) {
         // Generate the start cap
-
-        // The circle uvs should be a circle of diameter 0.25 with a center at (0.875, 0.125) in uv space. The normals should be the negative of the tangent at the start of the curve.
-        Transform3D start_transform = curve->sample_baked_with_rotation(0);
-        Vector3 start_transform_origin = start_transform.origin;
-        Vector3 start_normal = -start_transform.basis.get_column(2).normalized();
-
         int start_center_index = vertices.size();
-
-        float start_segment_width = 1.0f;
-        if (width_curve.is_valid()) {
-            start_segment_width = width_curve->sample(0.0f);
-        }
 
         // If the cap mode is cone, we need to add a vertex at the center of the start cap that is offset along the normal by the width of the line by half of the width. This will create a cone shape for the start cap.
         if (cap_mode == CAP_CONE) {
-            vertices.push_back(start_transform_origin - start_normal * radius * start_segment_width);
+            vertices.push_back(start_transform_origin + start_tangent * radius * start_segment_width);
         } else {
             vertices.push_back(start_transform_origin);
         }
@@ -253,9 +271,6 @@ void Line3D::generate_mesh() {
         uvs.push_back(Vector2(0.875, 0.125));
 
         // Generate first ring of vertices for the start cap. The first ring contains resolution + 1 vertices, with the final vertex being a duplicate of vertex 0 for the UV seam.
-        Vector3 start_circle_axis_1 = start_transform.basis.get_column(0).normalized();
-        Vector3 start_circle_axis_2 = start_transform.basis.get_column(1).normalized();
-
         for (int vertex = 0; vertex <= resolution; vertex++) {
             float angle = (float(vertex) / float(resolution)) * Math::TAU;
             Vector3 radial = start_circle_axis_1 * Math::cos(angle) + start_circle_axis_2 * Math::sin(angle);
@@ -284,19 +299,10 @@ void Line3D::generate_mesh() {
 
 
         // Generate the end cap
-        Transform3D end_transform = curve->sample_baked_with_rotation(total_length);
-        Vector3 end_transform_origin = end_transform.origin;
-        Vector3 end_normal = end_transform.basis.get_column(2).normalized();
-
         int end_center_index = vertices.size();
 
-        float end_segment_width = 1.0f;
-        if (width_curve.is_valid()) {
-            end_segment_width = width_curve->sample(1.0f);
-        }
-
         if(cap_mode == CAP_CONE) {
-            vertices.push_back(end_transform_origin - end_normal * radius * end_segment_width);
+            vertices.push_back(end_transform_origin + end_tangent * radius * end_segment_width);
         } else {
             vertices.push_back(end_transform_origin);
         }
@@ -332,6 +338,132 @@ void Line3D::generate_mesh() {
             indices.push_back(current_ring_vertex);
             indices.push_back(next_ring_vertex);
         }
+    } else if (cap_mode == CAP_ROUND) {
+        // Generate the start cap as a hemisphere
+            const int cap_resolution = resolution / 2;
+
+            int start_base_index = vertices.size();
+
+            // Generate hemisphere rings.
+            // theta = 0    -> outer edge
+            // theta = PI/2 -> pole
+            for (int ring = 0; ring <= cap_resolution; ring++) {
+                float theta = (float(ring) / float(cap_resolution)) * (Math::PI / 2.0f);
+
+                float ring_radius = Math::cos(theta) * radius * start_segment_width;
+                float axial_offset = Math::sin(theta) * radius * start_segment_width;
+
+                for (int vertex = 0; vertex <= resolution; vertex++) {
+                    float angle = (float(vertex) / float(resolution)) * Math::TAU;
+
+                    Vector3 radial =
+                        start_circle_axis_1 * Math::cos(angle) +
+                        start_circle_axis_2 * Math::sin(angle);
+
+                    Vector3 position =
+                        start_transform_origin
+                        + start_tangent * axial_offset
+                        + radial * ring_radius;
+
+                    vertices.push_back(position);
+
+                    // The hemisphere center is one radius behind the tube center.
+                    Vector3 normal =
+                        radial * Math::cos(theta)
+                        - start_tangent * Math::sin(theta);
+
+                    normals.push_back(normal.normalized());
+
+                    // Keep the exact same cap UV circle as the flat cap.
+                    uvs.push_back(Vector2(
+                        0.875 + Math::cos(angle) * 0.125 * Math::cos(theta),
+                        0.125 - Math::sin(angle) * 0.125 * Math::cos(theta)
+                    ));
+                }
+            }
+
+            // Connect hemisphere rings.
+            for (int ring = 0; ring < cap_resolution; ring++) {
+                int current_ring = start_base_index + ring * (resolution + 1);
+                int next_ring = current_ring + (resolution + 1);
+
+                for (int vertex = 0; vertex < resolution; vertex++) {
+                    int current = current_ring + vertex;
+                    int current_next = current + 1;
+                    int next = next_ring + vertex;
+                    int next_next = next + 1;
+
+                    indices.push_back(current);
+                    indices.push_back(next);
+                    indices.push_back(current_next);
+
+                    indices.push_back(current_next);
+                    indices.push_back(next);
+                    indices.push_back(next_next);
+                }
+            }
+
+        int end_base_index = vertices.size();
+
+        // Generate hemisphere rings.
+        // theta = 0    -> outer edge
+        // theta = PI/2 -> pole
+        for (int ring = 0; ring <= cap_resolution; ring++) {
+            float theta = (float(ring) / float(cap_resolution)) * (Math::PI / 2.0f);
+
+            float ring_radius = Math::cos(theta) * radius * end_segment_width;
+            float axial_offset = Math::sin(theta) * radius * end_segment_width;
+
+            for (int vertex = 0; vertex <= resolution; vertex++) {
+                float angle = (float(vertex) / float(resolution)) * Math::TAU;
+
+                Vector3 radial =
+                    end_circle_axis_1 * Math::cos(angle) +
+                    end_circle_axis_2 * Math::sin(angle);
+
+                Vector3 position =
+                    end_transform_origin
+                    - end_tangent * axial_offset
+                    + radial * ring_radius;
+
+                vertices.push_back(position);
+
+                Vector3 normal =
+                    radial * Math::cos(theta)
+                    + end_tangent * Math::sin(theta);
+
+                normals.push_back(normal.normalized());
+
+                // Same cap UV circle, mirrored horizontally like the
+                // existing end-cap UVs.
+                uvs.push_back(Vector2(
+                    0.875 - Math::cos(angle) * 0.125 * Math::cos(theta),
+                    0.375 - Math::sin(angle) * 0.125 * Math::cos(theta)
+                ));
+            }
+        }
+
+        // Connect hemisphere rings.
+        for (int ring = 0; ring < cap_resolution; ring++) {
+            int current_ring = end_base_index + ring * (resolution + 1);
+            int next_ring = current_ring + (resolution + 1);
+
+            for (int vertex = 0; vertex < resolution; vertex++) {
+                int current = current_ring + vertex;
+                int current_next = current + 1;
+                int next = next_ring + vertex;
+                int next_next = next + 1;
+
+                indices.push_back(current);
+                indices.push_back(current_next);
+                indices.push_back(next);
+
+                indices.push_back(current_next);
+                indices.push_back(next_next);
+                indices.push_back(next);
+            }
+        }
+
     }
     
 
