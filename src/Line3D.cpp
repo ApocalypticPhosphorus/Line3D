@@ -128,13 +128,7 @@ void Line3D::generate_mesh() {
         return;
     }
 
-    // Clear the existing mesh and regenerate it from the current curve.
-    if (!array_mesh.is_valid()) {
-        array_mesh = Ref<ArrayMesh>(memnew(ArrayMesh));
-        set_mesh(array_mesh);
-    } else {
-        array_mesh->clear_surfaces();
-    }
+    Ref<ArrayMesh> array_mesh = get_mesh();
 
     Array arrays;
     arrays.resize(Mesh::ARRAY_MAX);
@@ -472,6 +466,13 @@ void Line3D::generate_mesh() {
     arrays[Mesh::ARRAY_NORMAL] = normals;
     arrays[Mesh::ARRAY_TEX_UV] = uvs;
 
+    if (array_mesh.is_null()) {
+        array_mesh.instantiate();
+        set_mesh(array_mesh);
+    }
+
+
+    array_mesh->clear_surfaces();
     array_mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
     
 }
