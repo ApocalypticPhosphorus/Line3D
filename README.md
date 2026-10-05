@@ -16,7 +16,7 @@ It is designed to provide an easy way to turn a `Path3D` curve into a customizab
   * Flat
   * Cone
   * Hemisphere
-* Configurable radial segments and curve resolution
+* Configurable curve segments and radial resolution
 * UV mapping for the tube and end caps
 * Proper mesh normals for lighting
 * Implemented as a native C++ GDExtension
@@ -80,11 +80,11 @@ Controls how the ends of the tube are generated.
 
 ### Segments
 
-Controls the number of radial segments around the tube. Higher values produce a smoother circular cross-section at the cost of additional geometry.
+Controls how many samples are used along the curve. Higher values allow the generated mesh to follow curves more closely, at the cost of additional geometry.
 
 ### Resolution
 
-Controls how many samples are used along the curve. Higher values allow the generated mesh to follow curves more closely, at the cost of additional geometry.
+Controls the number of radial segments around the tube. Higher values produce a smoother circular cross-section at the cost of additional geometry.
 
 ## Example
 
