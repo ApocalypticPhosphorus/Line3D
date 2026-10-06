@@ -37,8 +37,6 @@ private:
 
     void generate_mesh();
 
-    Ref<ArrayMesh> array_mesh;
-
     void try_assign_parent_curve();
 
     void _notification(int p_what);
