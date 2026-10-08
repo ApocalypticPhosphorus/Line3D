@@ -124,7 +124,11 @@ Line3D::~Line3D() {
 
 void Line3D::generate_mesh() {
 
-    if (!curve.is_valid() || segments < 1 || resolution < 3 || width <= 0.0f) {
+    if (segments < 1 || resolution < 3 || width <= 0.0f) {
+        return;
+    }
+
+    if (!curve.is_valid() || curve->get_point_count() < 2) {
         return;
     }
 
@@ -584,7 +588,7 @@ void Line3D::try_assign_parent_curve() {
     Ref<Curve3D> parent_curve = path_node->get_curve();
 
     if (parent_curve.is_valid()) {
-        curve = parent_curve;
+        set_curve(parent_curve);
         generate_mesh();
     }
 }
