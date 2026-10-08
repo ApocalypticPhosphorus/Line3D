@@ -27,10 +27,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.x"
 
@@ -47,7 +47,7 @@ jobs:
         run: scons platform=${{ matrix.platform }} target=template_release
 
       - name: Upload platform build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Line3D-${{ matrix.platform }}
           path: project/addons/line3d/bin/${{ matrix.platform }}/
@@ -62,22 +62,22 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download Windows build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: Line3D-windows
           path: project/addons/line3d/bin/windows/
 
       - name: Download Linux build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: Line3D-linux
           path: project/addons/line3d/bin/linux/
 
       - name: Download macOS build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: Line3D-macos
           path: project/addons/line3d/bin/macos/
@@ -89,7 +89,7 @@ jobs:
           zip -r ../release/Line3D-${GITHUB_REF_NAME}.zip addons/
 
       - name: Upload release package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Line3D-release
           path: release/Line3D-${{ github.ref_name }}.zip
@@ -107,13 +107,13 @@ jobs:
 
     steps:
       - name: Download release package
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: Line3D-release
           path: release/
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: release/Line3D-${{ github.ref_name }}.zip
           generate_release_notes: true
