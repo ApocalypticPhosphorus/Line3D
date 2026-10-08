@@ -1,0 +1,50 @@
+name: Build Line3D
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - platform: windows
+            os: windows-latest
+
+          - platform: linux
+            os: ubuntu-latest
+
+          - platform: macos
+            os: macos-latest
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install SCons
+        run: pip install scons
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential
+
+      - name: Build
+        run: scons platform=${{ matrix.platform }} target=template_release
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Line3D-${{ matrix.platform }}
+          path: project/addons/line3d/bin/
