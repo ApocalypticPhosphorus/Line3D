@@ -116,4 +116,4 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           files: release/Line3D-${{ github.ref_name }}.zip
-          generate_release_notes: true
+          body_path: CHANGELOG.md
