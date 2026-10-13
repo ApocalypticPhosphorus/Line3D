@@ -124,6 +124,7 @@ Line3D::~Line3D() {
 
 void Line3D::generate_mesh() {
 
+    // Validation Checks
     if (segments < 1 || resolution < 3 || width <= 0.0f) {
         return;
     }
@@ -157,8 +158,8 @@ void Line3D::generate_mesh() {
         Vector3 center = ring_transform.origin;
 
         // 3. Get two perpendicular directions from ring_transform.basis
-        Vector3 circle_axis_1 = ring_transform.basis.get_column(0).normalized();
-        Vector3 circle_axis_2 = ring_transform.basis.get_column(1).normalized();
+        Vector3 segment_normal = get_normal(ring_transform);
+        Vector3 segment_binormal = get_binormal(ring_transform);
 
         // Get width from width_curve if it exists, from 0 at the start to 1 at the end of the curve. If width_curve is not valid, use the default width.
         float segment_width = 1.0f; // Default width
@@ -174,8 +175,8 @@ void Line3D::generate_mesh() {
 
             // Calculate radial direction
             Vector3 radial =
-                circle_axis_1 * Math::cos(angle) +
-                circle_axis_2 * Math::sin(angle);
+                segment_normal * Math::cos(angle) +
+                segment_binormal * Math::sin(angle);
 
             // Add vertex
             vertices.push_back(center + radial * width / 2.0f * segment_width);
@@ -229,30 +230,26 @@ void Line3D::generate_mesh() {
     // Start cap data
     Transform3D start_transform = curve->sample_baked_with_rotation(0);
     Vector3 start_transform_origin = start_transform.origin;
-    Vector3 start_tangent = start_transform.basis.get_column(2).normalized();
-    Vector3 start_normal = -start_tangent;
+    Vector3 start_tangent = get_tangent(start_transform);
+    Vector3 start_normal = get_normal(start_transform);
+    Vector3 start_binormal = get_binormal(start_transform);
 
     float start_segment_width = 1.0f;
     if (width_curve.is_valid()) {
         start_segment_width = width_curve->sample(0.0f);
     }
 
-    Vector3 start_circle_axis_1 = start_transform.basis.get_column(0).normalized();
-    Vector3 start_circle_axis_2 = start_transform.basis.get_column(1).normalized();
-
     // End cap data
     Transform3D end_transform = curve->sample_baked_with_rotation(total_length);
     Vector3 end_transform_origin = end_transform.origin;
-    Vector3 end_tangent = end_transform.basis.get_column(2).normalized();
-    Vector3 end_normal = end_tangent;
+    Vector3 end_tangent = get_tangent(end_transform);
+    Vector3 end_normal = get_normal(end_transform);
+    Vector3 end_binormal = get_binormal(end_transform);
 
     float end_segment_width = 1.0f;
     if (width_curve.is_valid()) {
         end_segment_width = width_curve->sample(1.0f);
     }
-
-    Vector3 end_circle_axis_1 = end_transform.basis.get_column(0).normalized();
-    Vector3 end_circle_axis_2 = end_transform.basis.get_column(1).normalized();
 
     if (cap_mode == CAP_FLAT || cap_mode == CAP_CONE) {
         // Generate the start cap
@@ -260,23 +257,23 @@ void Line3D::generate_mesh() {
 
         // If the cap mode is cone, we need to add a vertex at the center of the start cap that is offset along the normal by the width of the line by half of the width. This will create a cone shape for the start cap.
         if (cap_mode == CAP_CONE) {
-            vertices.push_back(start_transform_origin + start_tangent * radius * start_segment_width);
+            vertices.push_back(start_transform_origin - start_tangent * radius * start_segment_width);
         } else {
             vertices.push_back(start_transform_origin);
         }
 
-        normals.push_back(start_normal);
+        normals.push_back(-start_tangent);
         uvs.push_back(Vector2(0.875, 0.125));
 
         // Generate first ring of vertices for the start cap. The first ring contains resolution + 1 vertices, with the final vertex being a duplicate of vertex 0 for the UV seam.
         for (int vertex = 0; vertex <= resolution; vertex++) {
             float angle = (float(vertex) / float(resolution)) * Math::TAU;
-            Vector3 radial = start_circle_axis_1 * Math::cos(angle) + start_circle_axis_2 * Math::sin(angle);
+            Vector3 radial = start_normal * Math::cos(angle) + start_binormal * Math::sin(angle);
             vertices.push_back(start_transform_origin + radial * radius * start_segment_width);
             if (cap_mode == CAP_CONE) {
-                normals.push_back((radial - start_normal).normalized());
+                normals.push_back((radial - start_tangent).normalized());
             } else {
-                normals.push_back(start_normal);
+                normals.push_back(-start_tangent);
             }
             // Transform the radial vector into local space
             uvs.push_back(Vector2(
@@ -305,7 +302,7 @@ void Line3D::generate_mesh() {
             vertices.push_back(end_transform_origin);
         }
 
-        normals.push_back(end_normal);
+        normals.push_back(end_tangent);
         uvs.push_back(Vector2(0.875, 0.375));
 
         // Generate first ring of vertices for the end cap. The first ring contains resolution + 1 vertices, with the final vertex being a duplicate of vertex 0 for the UV seam.
@@ -317,9 +314,9 @@ void Line3D::generate_mesh() {
             Vector3 radial = end_circle_axis_1 * Math::cos(angle) + end_circle_axis_2 * Math::sin(angle);
             vertices.push_back(end_transform_origin + radial * radius * end_segment_width);
             if(cap_mode == CAP_CONE) {
-                normals.push_back((radial - end_normal).normalized() );
+                normals.push_back((radial + end_tangent).normalized() );
             } else {
-                normals.push_back(end_normal);
+                normals.push_back(end_tangent);
             }
             uvs.push_back(Vector2(
                 0.875 - Math::cos(angle) * 0.125,
@@ -355,12 +352,12 @@ void Line3D::generate_mesh() {
                     float angle = (float(vertex) / float(resolution)) * Math::TAU;
 
                     Vector3 radial =
-                        start_circle_axis_1 * Math::cos(angle) +
-                        start_circle_axis_2 * Math::sin(angle);
+                        start_normal * Math::cos(angle) +
+                        start_binormal * Math::sin(angle);
 
                     Vector3 position =
                         start_transform_origin
-                        + start_tangent * axial_offset
+                        - start_tangent * axial_offset
                         + radial * ring_radius;
 
                     vertices.push_back(position);
@@ -368,7 +365,7 @@ void Line3D::generate_mesh() {
                     // The hemisphere center is one radius behind the tube center.
                     Vector3 normal =
                         radial * Math::cos(theta)
-                        - start_tangent * Math::sin(theta);
+                        + start_tangent * Math::sin(theta);
 
                     normals.push_back(normal.normalized());
 
@@ -416,19 +413,19 @@ void Line3D::generate_mesh() {
                 float angle = (float(vertex) / float(resolution)) * Math::TAU;
 
                 Vector3 radial =
-                    end_circle_axis_1 * Math::cos(angle) +
-                    end_circle_axis_2 * Math::sin(angle);
+                    end_normal * Math::cos(angle) +
+                    end_binormal * Math::sin(angle);
 
                 Vector3 position =
                     end_transform_origin
-                    - end_tangent * axial_offset
+                    + end_tangent * axial_offset
                     + radial * ring_radius;
 
                 vertices.push_back(position);
 
                 Vector3 normal =
                     radial * Math::cos(theta)
-                    + end_tangent * Math::sin(theta);
+                    - end_tangent * Math::sin(theta);
 
                 normals.push_back(normal.normalized());
 
@@ -480,6 +477,21 @@ void Line3D::generate_mesh() {
     array_mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, arrays);
     
 }
+
+// Helper functions
+Vector3 Line3D::get_normal(Transform3D transform) {
+    return transform.basis.get_column(0).normalized();
+}
+
+Vector3 Line3D::get_binormal(Transform3D transform) {
+    return transform.basis.get_column(1).normalized();
+}
+
+Vector3 Line3D::get_tangent(Transform3D transform) {
+    return -transform.basis.get_column(2).normalized();
+}
+
+
 
 // Setters and getters
 void Line3D::set_curve(const Ref<Curve3D> &p_curve) {

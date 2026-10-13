@@ -37,6 +37,10 @@ private:
 
     void generate_mesh();
 
+    Vector3 get_normal(Transform3D transform);
+    Vector3 get_binormal(Transform3D transform);
+    Vector3 get_tangent(Transform3D transform);
+
     void try_assign_parent_curve();
 
     void _notification(int p_what);
