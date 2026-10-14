@@ -32,8 +32,9 @@ private:
     //Resolution of how many vertices are used as an extrusion profile
     int resolution = 64;
     // Cap mode enums
-
     CapMode cap_mode = CAP_FLAT;
+
+    bool mesh_generated = false;
 
     void generate_mesh();
 

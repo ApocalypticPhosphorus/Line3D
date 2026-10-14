@@ -126,11 +126,23 @@ void Line3D::generate_mesh() {
 
     // Validation Checks
     if (segments < 1 || resolution < 3 || width <= 0.0f) {
+        print_error("Line3D: Invalid parameters for mesh generation. This error should never be seen.", __FUNCTION__, " ", __FILE__, " ", __LINE__);
+        mesh_generated = false;
         return;
     }
 
     if (!curve.is_valid() || curve->get_point_count() < 2) {
+        mesh_generated = false;
         return;
+    }
+
+    //Check if any two points are at the same position, if so, return early to avoid generating a mesh with zero-length segments.
+    for (int i = 0; i < curve->get_point_count() - 1; i++) {
+        if (curve->get_point_position(i) == curve->get_point_position(i + 1)) {
+            print_error("Line3D: Two consecutive points in the curve are at the same position. This will result in a zero-length segment and cannot generate a mesh.", __FUNCTION__, " ", __FILE__, " ", __LINE__);
+            mesh_generated = false;
+            return;
+        }
     }
 
     Ref<ArrayMesh> array_mesh = get_mesh();
@@ -458,6 +470,8 @@ void Line3D::generate_mesh() {
                 indices.push_back(next);
             }
         }
+
+        mesh_generated = true;
 
     }
     
