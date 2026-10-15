@@ -88,7 +88,7 @@ void Line3D::_bind_methods() {
     );
 
     ADD_PROPERTY(
-        PropertyInfo(Variant::INT, "segments", PROPERTY_HINT_RANGE, "1,100,1"),
+        PropertyInfo(Variant::INT, "segments", PROPERTY_HINT_RANGE, "1,1000,1"),
         "set_segments",
         "get_segments"
     );
