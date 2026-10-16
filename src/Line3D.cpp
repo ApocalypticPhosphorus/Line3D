@@ -160,50 +160,47 @@ void Line3D::generate_mesh() {
     float total_length = curve->get_baked_length();
     float segment_length = total_length / float(segments);
 
-    // Generate segments
-    for (int i = 0; i <= segments; i++) {
+    for (int point_index = 0; point_index < curve->get_point_count(); point_index++) {
+        Vector3 point_position = curve->get_point_position(point_index);
+        //Get point position along curve
+        float point_distance = curve->get_closest_offset(point_position);
 
-        // 1. Get transform at this distance
-        Transform3D ring_transform = curve->sample_baked_with_rotation(segment_length * float(i));
+        //get the transform at this distance
+        Transform3D point_transform = curve->sample_baked_with_rotation(point_distance);
+        Vector3 point_tangent = get_tangent(point_transform);
 
-        // 2. Get center from transform
-        Vector3 center = ring_transform.origin;
+        Vector3 delta_tangent;
+        Vector3 middle;
 
-        // 3. Get two perpendicular directions from ring_transform.basis
-        Vector3 segment_normal = get_normal(ring_transform);
-        Vector3 segment_binormal = get_binormal(ring_transform);
+        //if the point is not the last point
+        if (point_index < curve->get_point_count()) {
+            //get the tangent at point distance + an extremely small offset and put in delta tangent
+            delta_tangent = get_tangent(curve->sample_baked_with_rotation(point_distance + 0.0001f));
+            middle = (point_tangent.normalized() + delta_tangent.normalized()).normalized();
+        }
+
+        bool sharp = is_sharp(curve->get_point_in(point_index), curve->get_point_out(point_index));
+        String sharp_str = sharp ? "true" : "false";
+
+        
+
+        // Debugging: Print the position, tangent, normal, and binormal of each point
+        print_line("Point " + String::num_int64(point_index) + ": Position = " + String(point_position) + ", Distance = " + String::num_real(point_distance) + ", Tangent = " + String(point_tangent) + ", Delta Tangent = " + String(delta_tangent) + ", Sharp = " + sharp_str);
+    }
+
+    // Generate segment verticies
+    for (int segment = 0; segment <= segments; segment++) {
+
+        Transform3D ring_transform = curve->sample_baked_with_rotation(segment_length * float(segment));
 
         // Get width from width_curve if it exists, from 0 at the start to 1 at the end of the curve. If width_curve is not valid, use the default width.
         float segment_width = 1.0f; // Default width
         if (width_curve.is_valid()) {
-            segment_width = width_curve->sample(float(i) / float(segments));
+            segment_width = width_curve->sample(float(segment) / float(segments));
         }
 
-        // 4. Generate resolution + 1 vertices. The final vertex duplicates the first vertex so the UV can reach 1.0
-        for (int j = 0; j <= resolution; j++) {
+        generate_vertex_ring(ring_transform, float(segment)/float(segments), radius * segment_width, resolution, vertices, normals, uvs);
 
-            // Calculate angle
-            float angle = (float(j) / float(resolution)) * Math::TAU;
-
-            // Calculate radial direction
-            Vector3 radial =
-                segment_normal * Math::cos(angle) +
-                segment_binormal * Math::sin(angle);
-
-            // Add vertex
-            vertices.push_back(center + radial * width / 2.0f * segment_width);
-
-            // Add corresponding normal
-            normals.push_back(radial.normalized());
-
-            // Add UV coordinates
-            // U goes from 0 to 0.75 around the circumference
-            // V goes from 0 to 1 along the length of the line
-            uvs.push_back(Vector2(
-                float(j) / float(resolution) * 0.75,
-                float(i) / float(segments)
-            ));
-        }
     }
 
     // 5. Generate indices for the triangles between rings
@@ -504,6 +501,39 @@ Vector3 Line3D::get_binormal(Transform3D transform) {
 Vector3 Line3D::get_tangent(Transform3D transform) {
     return -transform.basis.get_column(2).normalized();
 }
+
+bool Line3D::is_sharp(const Vector3 &in_handle, const Vector3 &out_handle) {
+    if (in_handle.is_zero_approx() || out_handle.is_zero_approx()) {
+        return true;
+    }
+
+    Vector3 in_dir = -in_handle.normalized();
+    Vector3 out_dir = out_handle.normalized();
+
+    return in_dir.dot(out_dir) < 0.999f;
+}
+
+void Line3D::generate_vertex_ring(const Transform3D &ring_transform, const float distance_along_curve, const float radius, int resolution, PackedVector3Array &vertices, PackedVector3Array &normals, PackedVector2Array &uvs) {
+
+    Vector3 center = ring_transform.origin;
+    Vector3 normal = get_normal(ring_transform);
+    Vector3 binormal = get_binormal(ring_transform);
+
+    for (int vertex = 0; vertex <= resolution; vertex++) {
+
+        float angle = (float(vertex) / float(resolution)) * Math::TAU;
+        Vector3 radial = normal * Math::cos(angle) + binormal * Math::sin(angle);
+
+        vertices.push_back(center + radial * radius);
+        normals.push_back(radial.normalized());
+        uvs.push_back(Vector2(
+            float(vertex) / float(resolution) * 0.75,
+            distance_along_curve
+        ));
+    }
+}
+
+
 
 
 

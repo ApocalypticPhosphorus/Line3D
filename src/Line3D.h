@@ -42,6 +42,10 @@ private:
     Vector3 get_binormal(Transform3D transform);
     Vector3 get_tangent(Transform3D transform);
 
+    bool is_sharp(const Vector3 &in_handle, const Vector3 &out_handle);
+
+    void generate_vertex_ring(const Transform3D &ring_transform, const float distance_along_curve, const float radius, int resolution, PackedVector3Array &vertices, PackedVector3Array &normals, PackedVector2Array &uvs);
+
     void try_assign_parent_curve();
 
     void _notification(int p_what);
